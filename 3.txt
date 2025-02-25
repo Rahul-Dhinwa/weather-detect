@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Wonderland</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* CSS Styles (Same as before, with additions for new features) */
+        /* Add this to the existing CSS */
+        .weather-character {
+            position: absolute;
+            bottom: 150px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 100px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            transition: all 1s ease;
+        }
+
+        .weather-character.sun {
+            background-image: url('https://www.svgrepo.com/show/362171/sun.svg');
+            animation: float 6s ease-in-out infinite;
+        }
+
+        .weather-character.rain {
+            background-image: url('https://www.svgrepo.com/show/362171/cloud-rain.svg');
+            animation: shake 1s ease-in-out infinite;
+        }
+
+        .weather-character.snow {
+            background-image: url('https://www.svgrepo.com/show/362171/snowflake.svg');
+            animation: spin 5s linear infinite;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(-50%) rotate(-5deg); }
+            50% { transform: translateX(-50%) rotate(5deg); }
+        }
+
+        .quote-container {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: var(--text-light);
+            font-size: 1.2rem;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 1s ease;
+        }
+
+        .quote-container.visible {
+            opacity: 1;
+        }
+
+        .seasonal-decoration {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .seasonal-decoration .leaf {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: url('https://www.svgrepo.com/show/362171/leaf.svg');
+            background-size: contain;
+            animation: fall 10s linear infinite;
+        }
+
+        @keyframes fall {
+            0% { transform: translateY(-100px) rotate(0deg); }
+            100% { transform: translateY(100vh) rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="scene-container">
+        <div class="scene">
+            <div class="sun"></div>
+            <div class="moon"></div>
+            <div class="stars"></div>
+            <div class="cloud cloud-1"></div>
+            <div class="cloud cloud-2"></div>
+            <div class="rain-container"></div>
+            <div class="snow-container"></div>
+            <div class="lightning inactive"></div>
+            <div class="fog"></div>
+            <div class="mountain"></div>
+            <div class="city"></div>
+            <div class="ground"></div>
+            <!-- Weather Character -->
+            <div class="weather-character sun"></div>
+            <!-- Seasonal Decoration -->
+            <div class="seasonal-decoration"></div>
+        </div>
+    </div>
+
+    <div class="app-container">
+        <button class="toggle-mode">Toggle Theme</button>
+        <div class="time-cycle">
+            <i class="time-icon fas fa-sun"></i>
+            <span class="time-text">Day</span>
+        </div>
+        
+        <div class="app-header">
+            <h1 class="app-title">Weather Wonderland</h1>
+            <div class="search-container">
+                <input type="text" id="location-input" class="location-input" placeholder="Enter a city..." />
+                <button class="search-btn" onclick="getWeather()">
+                    <i class="fas fa-search"></i>
+                </button>
+            </div>
+        </div>
+        
+        <div class="glass-panel" id="weather-panel">
+            <div class="weather-info" id="weather-info">
+                <div class="location-display">Enter a location to begin</div>
+                <div class="date-display">Weather awaits your curiosity</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quote Container -->
+    <div class="quote-container" id="quote-container">
+        <p id="quote-text">"The weather is a great metaphor for life—sometimes it's good, sometimes it's bad, and there's nothing much you can do about it but carry an umbrella."</p>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Background Music -->
+    <audio id="background-music" loop>
+        <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mpeg">
+        Your browser does not support the audio element.
+    </audio>
+
+    <script>
+        // DOM Elements
+        const scene = document.querySelector('.scene');
+        const sun = document.querySelector('.sun');
+        const moon = document.querySelector('.moon');
+        const cloud1 = document.querySelector('.cloud-1');
+        const cloud2 = document.querySelector('.cloud-2');
+        const rainContainer = document.querySelector('.rain-container');
+        const snowContainer = document.querySelector('.snow-container');
+        const lightning = document.querySelector('.lightning');
+        const fog = document.querySelector('.fog');
+        const stars = document.querySelector('.stars');
+        const mountain = document.querySelector('.mountain');
+        const ground = document.querySelector('.ground');
+        const city = document.querySelector('.city');
+        const weatherPanel = document.getElementById('weather-panel');
+        const weatherInfo = document.getElementById('weather-info');
+        const locationInput = document.getElementById('location-input');
+        const timeIcon = document.querySelector('.time-icon');
+        const timeText = document.querySelector('.time-text');
+        const toggleMode = document.querySelector('.toggle-mode');
+        const loading = document.getElementById('loading');
+        const weatherCharacter = document.querySelector('.weather-character');
+        const quoteContainer = document.getElementById('quote-container');
+        const quoteText = document.getElementById('quote-text');
+        const backgroundMusic = document.getElementById('background-music');
+        const seasonalDecoration = document.querySelector('.seasonal-decoration');
+
+        // State
+        let isDarkMode = false;
+        let isNight = false;
+
+        // Weather Quotes
+        const weatherQuotes = {
+            sunny: ["Keep your face to the sun and you will never see the shadows.", "Sunshine is the best medicine."],
+            rainy: ["Life isn't about waiting for the storm to pass; it's about learning to dance in the rain.", "Rainy days are perfect for cozying up with a good book."],
+            snowy: ["In the midst of winter, I found there was, within me, an invincible summer.", "Snowflakes are kisses from heaven."],
+            cloudy: ["Every cloud has a silver lining.", "Cloudy days make the sunny ones even brighter."],
+            stormy: ["Storms make trees take deeper roots.", "After every storm, there is a rainbow of hope."]
+        };
+
+        // Initialize the app
+        function initApp() {
+            // Initialize glass panel with animation
+            setTimeout(() => {
+                weatherPanel.classList.add('visible');
+            }, 300);
+
+            // Add event listeners
+            locationInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    getWeather();
+                }
+            });
+
+            toggleMode.addEventListener('click', toggleTheme);
+
+            // Create stars
+            createStars();
+
+            // Set default day scene
+            setDayScene();
+
+            // Play background music
+            backgroundMusic.play();
+        }
+
+        // Set weather scene with creative additions
+        function setWeatherScene(condition, isDay) {
+            // Reset all weather effects
+            rainContainer.classList.remove('active');
+            snowContainer.classList.remove('active');
+            lightning.classList.remove('active');
+            fog.classList.remove('active');
+            cloud1.classList.remove('visible');
+            cloud2.classList.remove('visible');
+            weatherCharacter.className = 'weather-character';
+            quoteContainer.classList.remove('visible');
+            seasonalDecoration.innerHTML = '';
+
+            // Determine if it's day or night
+            if (isDay) {
+                setDayScene();
+            } else {
+                setNightScene();
+            }
+
+            // Apply weather effects based on condition
+            const conditionLower = condition.toLowerCase();
+
+            if (conditionLower.includes('cloud') || conditionLower.includes('overcast')) {
+                cloud1.classList.add('visible');
+                cloud2.classList.add('visible');
+                weatherCharacter.classList.add('sun');
+                showQuote('cloudy');
+            }
+
+            if (conditionLower.includes('rain') || conditionLower.includes('drizzle')) {
+                cloud1.classList.add('visible');
+                cloud2.classList.add('visible');
+                createRain();
+                weatherCharacter.classList.add('rain');
+                showQuote('rainy');
+                backgroundMusic.src = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3'; // Rain music
+                backgroundMusic.play();
+            }
+
+            if (conditionLower.includes('storm') || conditionLower.includes('thunder')) {
+                cloud1.classList.add('visible');
+                cloud2.classList.add('visible');
+                createRain();
+                lightning.classList.add('active');
+                weatherCharacter.classList.add('rain');
+                showQuote('stormy');
+                backgroundMusic.src = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3'; // Storm music
+                backgroundMusic.play();
+            }
+
+            if (conditionLower.includes('snow')) {
+                cloud1.classList.add('visible');
+                cloud2.classList.add('visible');
+                createSnow();
+                weatherCharacter.classList.add('snow');
+                showQuote('snowy');
+                backgroundMusic.src = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3'; // Snow music
+                backgroundMusic.play();
+            }
+
+            if (conditionLower.includes('fog') || conditionLower.includes('mist')) {
+                fog.classList.add('active');
+                showQuote('cloudy');
+            }
+
+            if (conditionLower.includes('sun') && conditionLower.includes('cloud')) {
+                cloud1.classList.add('visible');
+                weatherCharacter.classList.add('sun');
+                showQuote('sunny');
+                backgroundMusic.src = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'; // Sunny music
+                backgroundMusic.play();
+            }
+        }
+
+        // Show a random weather quote
+        function showQuote(type) {
+            const quotes = weatherQuotes[type];
+            const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+            quoteText.textContent = randomQuote;
+            quoteContainer.classList.add('visible');
+        }
+
+        // Initialize the app when the DOM is loaded
+        document.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
